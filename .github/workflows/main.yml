@@ -1,85 +1,25 @@
-name: Build Native Battery Control v0.2.0
-
+name: Build Native Battery Control v0.4.0
 on:
   workflow_dispatch:
   push:
     branches: [main]
-
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Verify source ZIP
+      - name: Verify and extract source
         run: |
-          echo "3d1600e9ad36f9032b326c79cd7e93d79e8851963cca3a143e186e2857ac101f  NativeBatteryControl-v0.2.0-source.zip" | sha256sum -c -
+          echo "df54a27999fb6098a524bf518d10502156011fbbc43f056d0f7937801ef66a7a  NativeBatteryControl-v0.4.0-source.zip" | sha256sum -c -
           mkdir verified-source
-          unzip -o NativeBatteryControl-v0.2.0-source.zip -d verified-source
+          unzip -q NativeBatteryControl-v0.4.0-source.zip -d verified-source
           cat verified-source/app/build.gradle
-
-      - name: Fix app icon
-        working-directory: verified-source
-        run: |
-          mkdir -p app/src/main/res/drawable
-          cat > app/src/main/res/drawable/ic_battery_control.xml <<'EOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="48dp"
-              android:height="48dp"
-              android:viewportWidth="48"
-              android:viewportHeight="48">
-              <path
-                  android:fillColor="#176B60"
-                  android:pathData="M0,0H48V48H0Z"/>
-              <path
-                  android:fillColor="#FFFFFF"
-                  android:pathData="M19,5H29V9H19Z M14,10H34V42H14Z"/>
-              <path
-                  android:fillColor="#176B60"
-                  android:pathData="M25,14L18,27H24L22,38L31,23H25Z"/>
-          </vector>
-          EOF
-          sed -i 's|@android:drawable/ic_lock_idle_charging|@drawable/ic_battery_control|g' app/src/main/AndroidManifest.xml
-
-      - name: Fix dependency repositories
-        working-directory: verified-source
-        run: |
-          cat > settings.gradle <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  maven {
-                      url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
-                  }
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  maven {
-                      url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
-                  }
-                  mavenCentral()
-              }
-          }
-
-          rootProject.name = 'NativeBatteryControl'
-          include ':app'
-          EOF
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Check Android SDK
         id: sdk
         run: |
@@ -88,33 +28,28 @@ jobs:
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
-
       - uses: android-actions/setup-android@v4
         if: steps.sdk.outputs.ready != 'true'
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
           cache-disabled: true
-
-      - name: Compile Material 3 app
+      - name: Compile APK
         working-directory: verified-source
-        run: gradle --no-daemon --refresh-dependencies clean :app:assembleDebug
-
-      - name: Verify APK version and signature
+        run: gradle --no-daemon clean :app:assembleDebug
+      - name: Verify APK and version
         run: |
           APK=verified-source/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" > apk-info.txt
           cat apk-info.txt
-          grep -F "versionName='0.2.0'" apk-info.txt
-          grep -F "versionCode='2'" apk-info.txt
+          grep -F "versionName='0.4.0'" apk-info.txt
+          grep -F "versionCode='4'" apk-info.txt
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
-          cp "$APK" NativeBatteryControl-v0.2.0.apk
-
+          cp "$APK" NativeBatteryControl-v0.4.0.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: VERIFIED-NativeBatteryControl-v0.2.0
-          path: NativeBatteryControl-v0.2.0.apk
+          name: VERIFIED-NativeBatteryControl-v0.4.0
+          path: NativeBatteryControl-v0.4.0.apk
           if-no-files-found: error 
