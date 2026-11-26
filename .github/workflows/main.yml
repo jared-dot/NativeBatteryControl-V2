@@ -1,0 +1,66 @@
+name: Build Native Battery Control v0.2.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify source ZIP
+        run: |
+          echo "3d1600e9ad36f9032b326c79cd7e93d79e8851963cca3a143e186e2857ac101f  NativeBatteryControl-v0.2.0-source.zip" | sha256sum -c -
+          mkdir verified-source
+          unzip -o NativeBatteryControl-v0.2.0-source.zip -d verified-source
+          cat verified-source/app/build.gradle
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Check Android SDK
+        id: sdk
+        run: |
+          if [ -f "$ANDROID_HOME/platforms/android-35/android.jar" ] && [ -x "$ANDROID_HOME/build-tools/35.0.0/aapt" ] && [ -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: android-actions/setup-android@v4
+        if: steps.sdk.outputs.ready != 'true'
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compile Material 3 app
+        working-directory: verified-source
+        run: gradle --no-daemon clean :app:assembleDebug
+
+      - name: Verify APK version and signature
+        run: |
+          APK=verified-source/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" > apk-info.txt
+          cat apk-info.txt
+          grep -F "versionName='0.2.0'" apk-info.txt
+          grep -F "versionCode='2'" apk-info.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          cp "$APK" NativeBatteryControl-v0.2.0.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VERIFIED-NativeBatteryControl-v0.2.0
+          path: NativeBatteryControl-v0.2.0.apk
+          if-no-files-found: error 
