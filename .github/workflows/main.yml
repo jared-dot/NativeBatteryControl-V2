@@ -1,4 +1,4 @@
-name: Build Native Battery Control v0.6.0
+name: Build Native Battery Control v0.8.0
 on:
   workflow_dispatch:
   push:
@@ -12,9 +12,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify and extract source
         run: |
-          echo "867751fd34373623268792328fd6ad7a5ec2cb39016c2638cde9514868e0b34e  NativeBatteryControl-v0.6.0-source.zip" | sha256sum -c -
+          echo "386305dcff0694b327231074826316cc372df0be80aeafa025b7dc966f5e9a29  NativeBatteryControl-v0.8.0-source.zip" | sha256sum -c -
           mkdir verified-source
-          unzip -q NativeBatteryControl-v0.6.0-source.zip -d verified-source
+          unzip -q NativeBatteryControl-v0.8.0-source.zip -d verified-source
           cat verified-source/app/build.gradle
       - uses: actions/setup-java@v4
         with:
@@ -40,9 +40,11 @@ jobs:
         working-directory: verified-source
         run: |
           mkdir -p /tmp/verification-tests
-          javac -d /tmp/verification-tests app/src/main/java/dev/nativebattery/control/Verification.java app/src/main/java/dev/nativebattery/control/EnforcementPolicy.java tests/VerificationTest.java tests/EnforcementPolicyTest.java
+          javac -d /tmp/verification-tests app/src/main/java/dev/nativebattery/control/BatteryDiagnostics.java tests/BatteryDiagnosticsTest.java app/src/main/java/dev/nativebattery/control/Verification.java app/src/main/java/dev/nativebattery/control/EnforcementPolicy.java tests/VerificationTest.java tests/EnforcementPolicyTest.java app/src/main/java/dev/nativebattery/control/ToolPolicy.java tests/ToolPolicyTest.java
           java -cp /tmp/verification-tests dev.nativebattery.control.VerificationTest
           java -cp /tmp/verification-tests dev.nativebattery.control.EnforcementPolicyTest
+          java -cp /tmp/verification-tests dev.nativebattery.control.BatteryDiagnosticsTest
+          java -cp /tmp/verification-tests dev.nativebattery.control.ToolPolicyTest
       - name: Compile APK
         working-directory: verified-source
         run: gradle --no-daemon clean :app:assembleDebug
@@ -51,12 +53,12 @@ jobs:
           APK=verified-source/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" > apk-info.txt
           cat apk-info.txt
-          grep -F "versionName='0.6.0'" apk-info.txt
-          grep -F "versionCode='6'" apk-info.txt
+          grep -F "versionName='0.8.0'" apk-info.txt
+          grep -F "versionCode='8'" apk-info.txt
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
-          cp "$APK" NativeBatteryControl-v0.6.0.apk
+          cp "$APK" NativeBatteryControl-v0.8.0.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: VERIFIED-NativeBatteryControl-v0.6.0
-          path: NativeBatteryControl-v0.6.0.apk
-          if-no-files-found: error 
+          name: VERIFIED-NativeBatteryControl-v0.8.0
+          path: NativeBatteryControl-v0.8.0.apk
+          if-no-files-found: error
